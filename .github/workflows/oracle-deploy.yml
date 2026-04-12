@@ -1,16 +1,21 @@
 # Deploy na VM Oracle (Docker Compose) após push na branch principal.
 #
-# Job deploy: environment: prd → secrets/variables do ambiente **prd** (e Repository secrets OCI/GHCR)
-# são passados por SSH e gravados em deploy/oracle/.env.goai.deploy na VM.
+# Job deploy: environment: prd → tudo o que definires em Secrets/Variables de **prd**
+# (e Repository secrets OCI/GHCR) é passado por SSH e materializado em
+# deploy/oracle/.env.goai.deploy na VM (write_kv no script).
 #
-# Repository secrets: OCI_VM_HOST, OCI_VM_USER, OCI_SSH_PRIVATE_KEY; opcional GHCR_*
-# Variable (recomendado) ou secret: OCI_DEPLOY_ROOT = pasta pai de deploy/oracle na VM (ex: /home/ubuntu/www).
-# Não corre git na VM; atualiza deploy/oracle (e compose) com rsync/scp ou outro método.
+# Repository secrets (infra): OCI_VM_HOST, OCI_VM_USER, OCI_SSH_PRIVATE_KEY; opcionais GHCR_*.
+# OCI_DEPLOY_ROOT: preferir Variable (não sensível), com fallback para Secret.
+# Não corre git na VM; mantém deploy/oracle (compose + env base) via rsync/scp/outro método.
 #
-# Environment **prd** — Secrets: GOAI_ADMIN_API_KEY (e opcional GOAI_GEMINI_API_KEYS se não usares Variable)
-# Environment **prd** — Variables: GOAI_GEMINI_API_KEYS (CSV de chaves; menos privado que Secret), GOAI_GEMINI_MODEL (opcional)
+# Environment **prd** — Secrets (sensível):
+#   GOAI_ADMIN_API_KEY, GOAI_GEMINI_API_KEYS (recomendado em Secret)
 #
-# ACME / Caddy continuam no .env na VM (não são enviados por este workflow).
+# Environment **prd** — Variables (não sensível / tuning):
+#   GOAI_GEMINI_MODEL, OCI_DEPLOY_ROOT
+#   GOAI_GEMINI_API_KEYS também pode estar aqui (CSV), mas vars não são mascaradas nos logs.
+#
+# ACME / Caddy continuam no .env da VM (não são enviados por este workflow).
 name: oracle-deploy
 
 on:
@@ -108,21 +113,14 @@ jobs:
           username: ${{ secrets.OCI_VM_USER }}
           key: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
           command_timeout: 30m
-          debug: true
           envs: OCI_DEPLOY_ROOT,GHCR_PULL_TOKEN,GHCR_USER,GOAI_GHCR_OWNER,GOAI_IMAGE_TAG,GOAI_ADMIN_API_KEY,GOAI_GEMINI_API_KEYS,GOAI_GEMINI_MODEL
           script_stop: true
           script: |
             set -euo pipefail
             ROOT="${OCI_DEPLOY_ROOT:-/opt/go}"
-            export GOAI_GHCR_OWNER="${GOAI_GHCR_OWNER:-}"
+            export GOAI_GHCR_OWNER="${GOAI_GHCR_OWNER}"
             export GOAI_IMAGE_TAG="${GOAI_IMAGE_TAG:-main}"
             ORACLE_DIR="${ROOT}/deploy/oracle"
-            echo "goai deploy: effective ROOT=${ROOT} (set secret OCI_DEPLOY_ROOT if wrong)"
-            echo "goai deploy: ORACLE_DIR=${ORACLE_DIR}"
-            if [ -z "${GOAI_GHCR_OWNER}" ]; then
-              echo "goai deploy: ERROR GOAI_GHCR_OWNER is empty on remote (check envs passed to ssh-action)" >&2
-              exit 1
-            fi
             if [ ! -d "${ORACLE_DIR}" ]; then
               echo "ERROR: ${ORACLE_DIR} does not exist." >&2
               echo "Create GitHub Actions secret OCI_DEPLOY_ROOT = parent of deploy/oracle (ex: /home/ubuntu/www)." >&2
@@ -132,53 +130,22 @@ jobs:
               echo "ERROR: missing ${ORACLE_DIR}/docker-compose.gotv.yml" >&2
               exit 1
             fi
-            if [ ! -w "${ORACLE_DIR}" ]; then
-              echo "ERROR: ${ORACLE_DIR} is not writable by $(whoami). Example fix: sudo chown -R $(whoami) \"${ORACLE_DIR}\"" >&2
-              ls -ld "${ORACLE_DIR}" >&2 || true
-              exit 1
-            fi
-            echo "goai deploy: path OK (exists, compose file, writable)"
             DEPLOY_ENV="${ORACLE_DIR}/.env.goai.deploy"
             umask 077
-            rm -f "${DEPLOY_ENV}" || true
-            : > "${DEPLOY_ENV}" || { echo "goai deploy: ERROR cannot create ${DEPLOY_ENV}" >&2; ls -la "${ORACLE_DIR}" >&2; exit 1; }
-            echo "goai deploy: step=env-file-empty"
+            : > "${DEPLOY_ENV}"
             write_kv() {
               _k="$1"
               _v="$2"
               [ -n "${_v}" ] || return 0
-              printf '%s=%s\n' "${_k}" "${_v}" >> "${DEPLOY_ENV}" || {
-                echo "goai deploy: ERROR printf failed for ${_k}" >&2
-                exit 1
-              }
+              printf '%s=%s\n' "${_k}" "${_v}" >> "${DEPLOY_ENV}"
             }
             write_kv GOAI_ADMIN_API_KEY "${GOAI_ADMIN_API_KEY:-}"
             write_kv GOAI_GEMINI_API_KEYS "${GOAI_GEMINI_API_KEYS:-}"
             write_kv GOAI_GEMINI_MODEL "${GOAI_GEMINI_MODEL:-}"
-            echo "goai deploy: step=kvs-written"
             chmod 600 "${DEPLOY_ENV}" || true
-            echo "goai deploy: step=chmod-done"
             if [ -n "${GHCR_PULL_TOKEN:-}" ]; then
-              set +e
-              set +o pipefail
               echo "$GHCR_PULL_TOKEN" | docker login ghcr.io -u "${GHCR_USER:-${GOAI_GHCR_OWNER}}" --password-stdin
-              _login_rc=$?
-              set -o pipefail
-              set -e
-              if [ "${_login_rc}" -ne 0 ]; then
-                echo "goai deploy: WARN docker login ghcr.io failed (rc=${_login_rc}); continuing if image is public" >&2
-              fi
             fi
-            echo "goai deploy: step=docker-login-block-done"
-            # Sem git na VM: mantém deploy/oracle e repos à mão (rsync/scp) ou outro fluxo.
             cd "${ORACLE_DIR}"
-            echo "goai deploy: step=compose-pull"
-            if docker compose -f docker-compose.gotv.yml pull goai; then
-              echo "goai: image from GHCR"
-            else
-              echo "goai: pull failed, building from ../../GoAI"
-              docker compose -f docker-compose.gotv.yml build goai
-            fi
-            echo "goai deploy: step=compose-up"
+            docker compose -f docker-compose.gotv.yml pull goai
             docker compose -f docker-compose.gotv.yml up -d --force-recreate goai
-            echo "goai deploy: done"

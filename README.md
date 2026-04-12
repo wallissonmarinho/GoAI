@@ -31,6 +31,11 @@ Padrão alinhado ao **GoAnimes**: `checkout@v6`, `setup-go@v6` (sem cache de mó
 
 **Environment `prd` (repo GoAI):** `GOAI_ADMIN_API_KEY` (Secret). **`GOAI_GEMINI_API_KEYS`:** Secret (recomendado) ou **Variable** `GOAI_GEMINI_API_KEYS` (CSV; menos privado). Variable opcional `GOAI_GEMINI_MODEL`. O GoTV **não** grava `GOAI_*`.
 
+Checklist rápido (Secrets vs Variables no deploy):
+- **Secrets:** `GOAI_ADMIN_API_KEY` e, de preferência, `GOAI_GEMINI_API_KEYS`.
+- **Variables:** `GOAI_GEMINI_MODEL` e `OCI_DEPLOY_ROOT` (path da VM, não sensível).
+- No `oracle-deploy`, esses valores são passados por SSH e escritos em `deploy/oracle/.env.goai.deploy` antes do `docker compose ... up -d --force-recreate goai`.
+
 ## Environment
 
 | Variable | Required | Description |
