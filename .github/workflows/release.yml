@@ -1,20 +1,13 @@
-# CI em branches de trabalho e PRs. Push em main/master NÃO dispara isto — o oracle-deploy já corre test+deploy.
-name: ci
+# Release: testes + binário em tags v*
+name: release
 
 on:
   push:
-    branches-ignore:
-      - main
-      - master
-  pull_request:
-    branches: [main, master]
-
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+    tags:
+      - "v*"
 
 jobs:
-  test:
+  release:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -38,4 +31,9 @@ jobs:
         run: go test ./... -count=1
 
       - name: Build
-        run: go build -trimpath -o /tmp/goai ./cmd/goai
+        run: go build -trimpath -ldflags="-s -w" -o bin/goai ./cmd/goai
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: goai-linux-amd64
+          path: bin/goai
