@@ -23,8 +23,11 @@ Padrão alinhado ao **GoAnimes**: `checkout@v6`, `setup-go@v6` (sem cache de mó
 |----------|--------|--------|
 | **ci** | PR para `main` / push em branches que **não** sejam `main` ou `master` | vet + lint + test + build (em `main` isto não corre — evita duplicar com **ghcr-publish**) |
 | **ghcr-publish** | push em `main` | vet + lint + test + imagem multi-arch no GHCR (`:main`, `:sha`) |
+| **oracle-deploy** | após **ghcr-publish** OK em `main`, ou *Run workflow* manual | SSH na VM: `pull`/`build` só o serviço **goai** e `up -d --force-recreate goai` |
 
-Na VM (stack GoTV), o `oracle-deploy` do repo **GoTV** faz `docker compose pull goai`; se a imagem ainda não existir no GHCR, faz **build** a partir de `../../GoAI`.
+**Secrets no repo GoAI** (os mesmos nomes que no GoTV, para o SSH funcionar): `OCI_VM_HOST`, `OCI_VM_USER`, `OCI_SSH_PRIVATE_KEY`, opcional `OCI_DEPLOY_ROOT`, e opcional `GHCR_*` se a imagem for privada.
+
+Os segredos **GOAI_*** que o processo precisa na VM continuam a ser escritos pelo **oracle-deploy do repositório GoTV** (`.env.gotv.deploy`). O **oracle-deploy do GoAI** só atualiza o contentor com a imagem nova; podes usar só o GoTV para deploy completo se preferires um único pipeline.
 
 ## Environment
 

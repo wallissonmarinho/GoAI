@@ -1,0 +1,68 @@
+# Atualiza só o serviço **goai** na VM (docker-compose.gotv.yml), após imagem no GHCR.
+# Os segredos GOAI_* na VM continuam a ser escritos pelo workflow **oracle-deploy** do repositório GoTV
+# (.env.gotv.deploy). Este job apenas pull/build do contentor goai e recreate.
+#
+# Duplica os mesmos repository secrets que usas no GoTV (SSH + caminho):
+#   OCI_VM_HOST, OCI_VM_USER, OCI_SSH_PRIVATE_KEY, OCI_DEPLOY_ROOT (opcional)
+# Opcional (imagem GHCR privada): GHCR_PULL_TOKEN, GHCR_USER
+#
+# Disparo:
+#   - Automático: quando **ghcr-publish** termina com sucesso em main
+#   - Manual: Actions → oracle-deploy → Run workflow
+name: oracle-deploy
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: [ghcr-publish]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: goai-oracle-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GOAI_IMAGE_TAG: main
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    steps:
+      - name: GHCR owner for VM
+        id: ghcr
+        run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy goai on Oracle VM
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          OCI_DEPLOY_ROOT: ${{ secrets.OCI_DEPLOY_ROOT }}
+          GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+          GHCR_USER: ${{ secrets.GHCR_USER }}
+          GOAI_GHCR_OWNER: ${{ steps.ghcr.outputs.owner }}
+          GOAI_IMAGE_TAG: ${{ env.GOAI_IMAGE_TAG }}
+        with:
+          host: ${{ secrets.OCI_VM_HOST }}
+          username: ${{ secrets.OCI_VM_USER }}
+          key: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
+          command_timeout: 30m
+          envs: OCI_DEPLOY_ROOT,GHCR_PULL_TOKEN,GHCR_USER,GOAI_GHCR_OWNER,GOAI_IMAGE_TAG
+          script_stop: true
+          script: |
+            set -euo pipefail
+            ROOT="${OCI_DEPLOY_ROOT:-/opt/go}"
+            ORACLE_DIR="${ROOT}/deploy/oracle"
+            export GOAI_GHCR_OWNER="${GOAI_GHCR_OWNER}"
+            export GOAI_IMAGE_TAG="${GOAI_IMAGE_TAG:-main}"
+            if [ -n "${GHCR_PULL_TOKEN:-}" ]; then
+              echo "$GHCR_PULL_TOKEN" | docker login ghcr.io -u "${GHCR_USER:-${GOAI_GHCR_OWNER}}" --password-stdin
+            fi
+            cd "${ORACLE_DIR}"
+            if docker compose -f docker-compose.gotv.yml pull goai; then
+              echo "goai: image from GHCR"
+            else
+              echo "goai: pull failed, building from ../../GoAI"
+              docker compose -f docker-compose.gotv.yml build goai
+            fi
+            docker compose -f docker-compose.gotv.yml up -d --force-recreate goai
