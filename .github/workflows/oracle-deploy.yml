@@ -112,6 +112,17 @@ jobs:
             export GOAI_GHCR_OWNER="${GOAI_GHCR_OWNER}"
             export GOAI_IMAGE_TAG="${GOAI_IMAGE_TAG:-main}"
             ORACLE_DIR="${ROOT}/deploy/oracle"
+            echo "goai deploy: effective ROOT=${ROOT} (set secret OCI_DEPLOY_ROOT if wrong)"
+            echo "goai deploy: ORACLE_DIR=${ORACLE_DIR}"
+            if [ ! -d "${ORACLE_DIR}" ]; then
+              echo "ERROR: ${ORACLE_DIR} does not exist." >&2
+              echo "Create GitHub Actions secret OCI_DEPLOY_ROOT = parent of deploy/oracle (ex: /home/ubuntu/www)." >&2
+              exit 1
+            fi
+            if [ ! -f "${ORACLE_DIR}/docker-compose.gotv.yml" ]; then
+              echo "ERROR: missing ${ORACLE_DIR}/docker-compose.gotv.yml" >&2
+              exit 1
+            fi
             DEPLOY_ENV="${ORACLE_DIR}/.env.goai.deploy"
             umask 077
             : > "${DEPLOY_ENV}"
