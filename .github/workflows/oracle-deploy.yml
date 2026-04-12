@@ -4,7 +4,8 @@
 # são passados por SSH e gravados em deploy/oracle/.env.goai.deploy na VM.
 #
 # Repository secrets: OCI_VM_HOST, OCI_VM_USER, OCI_SSH_PRIVATE_KEY; opcional GHCR_*
-# Variable (recomendado) ou secret: OCI_DEPLOY_ROOT = pasta pai de deploy/oracle na VM (ex: /home/ubuntu/www)
+# Variable (recomendado) ou secret: OCI_DEPLOY_ROOT = pasta pai de deploy/oracle na VM (ex: /home/ubuntu/www).
+# Não corre git na VM; atualiza deploy/oracle (e compose) com rsync/scp ou outro método.
 #
 # Environment **prd** — Secrets: GOAI_ADMIN_API_KEY (e opcional GOAI_GEMINI_API_KEYS se não usares Variable)
 # Environment **prd** — Variables: GOAI_GEMINI_API_KEYS (CSV de chaves; menos privado que Secret), GOAI_GEMINI_MODEL (opcional)
@@ -169,14 +170,7 @@ jobs:
               fi
             fi
             echo "goai deploy: step=docker-login-block-done"
-            # VM must have docker-compose.gotv.yml with service "goai" (deploy/oracle no repo). Sem pull fica versão antiga → "no such service: goai".
-            if [ -d "${ROOT}/.git" ]; then
-              echo "goai deploy: updating ${ROOT} (git pull --ff-only)"
-              git -C "${ROOT}" pull --ff-only
-            else
-              echo "goai deploy: ${ROOT} has no .git - sync deploy/oracle manually or clone repo at ROOT."
-            fi
-            echo "goai deploy: step=git-block-done"
+            # Sem git na VM: mantém deploy/oracle e repos à mão (rsync/scp) ou outro fluxo.
             cd "${ORACLE_DIR}"
             echo "goai deploy: step=compose-pull"
             if docker compose -f docker-compose.gotv.yml pull goai; then
