@@ -6,8 +6,8 @@
 # Repository secrets: OCI_VM_HOST, OCI_VM_USER, OCI_SSH_PRIVATE_KEY; opcional GHCR_*
 # Variable (recomendado) ou secret: OCI_DEPLOY_ROOT = pasta pai de deploy/oracle na VM (ex: /home/ubuntu/www)
 #
-# Environment **prd** — Secrets: GOAI_ADMIN_API_KEY, GOAI_GEMINI_API_KEYS
-# Environment **prd** — Variables: GOAI_GEMINI_MODEL (opcional)
+# Environment **prd** — Secrets: GOAI_ADMIN_API_KEY (e opcional GOAI_GEMINI_API_KEYS se não usares Variable)
+# Environment **prd** — Variables: GOAI_GEMINI_API_KEYS (CSV de chaves; menos privado que Secret), GOAI_GEMINI_MODEL (opcional)
 #
 # ACME / Caddy continuam no .env na VM (não são enviados por este workflow).
 name: oracle-deploy
@@ -99,7 +99,8 @@ jobs:
           GOAI_GHCR_OWNER: ${{ steps.ghcr.outputs.owner }}
           GOAI_IMAGE_TAG: main
           GOAI_ADMIN_API_KEY: ${{ secrets.GOAI_ADMIN_API_KEY }}
-          GOAI_GEMINI_API_KEYS: ${{ secrets.GOAI_GEMINI_API_KEYS }}
+          # Preferir Secret para chaves; Variable aceita CSV (vars não são mascaradas nos logs).
+          GOAI_GEMINI_API_KEYS: ${{ vars.GOAI_GEMINI_API_KEYS || secrets.GOAI_GEMINI_API_KEYS }}
           GOAI_GEMINI_MODEL: ${{ vars.GOAI_GEMINI_MODEL }}
         with:
           host: ${{ secrets.OCI_VM_HOST }}

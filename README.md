@@ -29,7 +29,7 @@ Padrão alinhado ao **GoAnimes**: `checkout@v6`, `setup-go@v6` (sem cache de mó
 
 **Variable** (recomendado) ou secret: **`OCI_DEPLOY_ROOT`** — caminho na VM onde está `deploy/oracle` (ex. `/home/ubuntu/www`). Usar *Variable* evita máscara nos logs do Actions.
 
-**Environment `prd` (repo GoAI):** `GOAI_ADMIN_API_KEY`, `GOAI_GEMINI_API_KEYS`; variable opcional `GOAI_GEMINI_MODEL`. O GoTV **não** grava `GOAI_*` — deploys são independentes.
+**Environment `prd` (repo GoAI):** `GOAI_ADMIN_API_KEY` (Secret). **`GOAI_GEMINI_API_KEYS`:** Secret (recomendado) ou **Variable** `GOAI_GEMINI_API_KEYS` (CSV; menos privado). Variable opcional `GOAI_GEMINI_MODEL`. O GoTV **não** grava `GOAI_*`.
 
 ## Environment
 
