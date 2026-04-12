@@ -34,42 +34,42 @@ func buildSeriesPrompt(in domain.SeriesAuditRequest) string {
 	if displayName == "" {
 		displayName = strings.TrimSpace(in.TorrentTitle)
 	}
-	b.WriteString(fmt.Sprintf(`{"series_name":%q`, displayName))
+	fmt.Fprintf(&b, `{"series_name":%q`, displayName)
 	if strings.TrimSpace(in.TorrentTitle) != "" {
-		b.WriteString(fmt.Sprintf(`,"torrent_title":%q`, strings.TrimSpace(in.TorrentTitle)))
+		fmt.Fprintf(&b, `,"torrent_title":%q`, strings.TrimSpace(in.TorrentTitle))
 	}
 	if strings.TrimSpace(in.TorrentLink) != "" {
-		b.WriteString(fmt.Sprintf(`,"torrent_link":%q`, strings.TrimSpace(in.TorrentLink)))
+		fmt.Fprintf(&b, `,"torrent_link":%q`, strings.TrimSpace(in.TorrentLink))
 	}
 	if in.SeriesID != "" {
-		b.WriteString(fmt.Sprintf(`,"series_id":%q`, in.SeriesID))
+		fmt.Fprintf(&b, `,"series_id":%q`, in.SeriesID)
 	}
 	if in.MalID > 0 {
-		b.WriteString(fmt.Sprintf(`,"mal_id":%d`, in.MalID))
+		fmt.Fprintf(&b, `,"mal_id":%d`, in.MalID)
 	}
 	if strings.TrimSpace(in.ImdbID) != "" {
-		b.WriteString(fmt.Sprintf(`,"imdb_id":%q`, strings.TrimSpace(in.ImdbID)))
+		fmt.Fprintf(&b, `,"imdb_id":%q`, strings.TrimSpace(in.ImdbID))
 	}
 	if in.Year > 0 {
-		b.WriteString(fmt.Sprintf(`,"year":%d`, in.Year))
+		fmt.Fprintf(&b, `,"year":%d`, in.Year)
 	}
 	if strings.TrimSpace(in.TitlePreferred) != "" {
-		b.WriteString(fmt.Sprintf(`,"title_preferred":%q`, strings.TrimSpace(in.TitlePreferred)))
+		fmt.Fprintf(&b, `,"title_preferred":%q`, strings.TrimSpace(in.TitlePreferred))
 	}
 	if strings.TrimSpace(in.TitleNative) != "" {
-		b.WriteString(fmt.Sprintf(`,"title_native":%q`, strings.TrimSpace(in.TitleNative)))
+		fmt.Fprintf(&b, `,"title_native":%q`, strings.TrimSpace(in.TitleNative))
 	}
 	if in.ExistingTVDBSeriesID > 0 {
-		b.WriteString(fmt.Sprintf(`,"existing_tvdb_series_id":%d`, in.ExistingTVDBSeriesID))
+		fmt.Fprintf(&b, `,"existing_tvdb_series_id":%d`, in.ExistingTVDBSeriesID)
 	}
 	if in.ExistingAniDBAID > 0 {
-		b.WriteString(fmt.Sprintf(`,"existing_anidb_aid":%d`, in.ExistingAniDBAID))
+		fmt.Fprintf(&b, `,"existing_anidb_aid":%d`, in.ExistingAniDBAID)
 	}
 	if in.ExistingAniListID > 0 {
-		b.WriteString(fmt.Sprintf(`,"existing_anilist_id":%d`, in.ExistingAniListID))
+		fmt.Fprintf(&b, `,"existing_anilist_id":%d`, in.ExistingAniListID)
 	}
 	if in.ExistingTMDBTVID > 0 {
-		b.WriteString(fmt.Sprintf(`,"existing_tmdb_tv_id":%d`, in.ExistingTMDBTVID))
+		fmt.Fprintf(&b, `,"existing_tmdb_tv_id":%d`, in.ExistingTMDBTVID)
 	}
 	b.WriteString("}\n")
 	return b.String()
@@ -89,13 +89,13 @@ func buildReleasePrompt(in domain.ReleaseAuditRequest) string {
 	var b strings.Builder
 	b.WriteString(releaseSystem)
 	b.WriteString("\n\n")
-	b.WriteString(fmt.Sprintf("torrent_title: %q\n", in.TorrentTitle))
+	fmt.Fprintf(&b, "torrent_title: %q\n", in.TorrentTitle)
 	if strings.TrimSpace(in.SeriesName) != "" {
-		b.WriteString(fmt.Sprintf("series_name: %q\n", strings.TrimSpace(in.SeriesName)))
+		fmt.Fprintf(&b, "series_name: %q\n", strings.TrimSpace(in.SeriesName))
 	}
 	if strings.TrimSpace(in.SeriesID) != "" {
-		b.WriteString(fmt.Sprintf("series_id: %q\n", strings.TrimSpace(in.SeriesID)))
+		fmt.Fprintf(&b, "series_id: %q\n", strings.TrimSpace(in.SeriesID))
 	}
-	b.WriteString(fmt.Sprintf("current_season: %d\ncurrent_episode: %d\nis_special: %v\n", in.CurrentSeason, in.CurrentEpisode, in.IsSpecial))
+	fmt.Fprintf(&b, "current_season: %d\ncurrent_episode: %d\nis_special: %v\n", in.CurrentSeason, in.CurrentEpisode, in.IsSpecial)
 	return b.String()
 }
