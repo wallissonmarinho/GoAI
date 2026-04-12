@@ -15,6 +15,15 @@ Consumers call this over HTTP with a shared Bearer secret; they do **not** need 
 | Driven adapter (Gemini) | `internal/adapters/gemini` |
 | Binário | `cmd/goai` |
 
+## GitHub Actions
+
+| Workflow | Quando | O quê |
+|----------|--------|--------|
+| **ci** | push/PR em `main` | `go test ./...` |
+| **ghcr-publish** | push em `main` | test + build multi-arch (`linux/amd64`, `linux/arm64`) e push `ghcr.io/<owner>/goai:main` e `:sha` |
+
+Na VM (stack GoTV), o `oracle-deploy` do repo **GoTV** faz `docker compose pull goai`; se a imagem ainda não existir no GHCR, faz **build** a partir de `../../GoAI`.
+
 ## Environment
 
 | Variable | Required | Description |
