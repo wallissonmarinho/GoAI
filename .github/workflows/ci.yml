@@ -1,8 +1,11 @@
+# CI em branches de trabalho e PRs. Push em main/master NÃO dispara isto — o ghcr-publish já corre test+imagem.
 name: ci
 
 on:
   push:
-    branches: [main, master]
+    branches-ignore:
+      - main
+      - master
   pull_request:
     branches: [main, master]
 
@@ -13,12 +16,26 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+          cache: false
 
-      - name: go test
-        run: go test ./...
+      - name: go vet
+        run: go vet ./...
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.11
+
+      - name: Test
+        run: go test ./... -count=1
+
+      - name: Build
+        run: go build -trimpath -o /tmp/goai ./cmd/goai

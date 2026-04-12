@@ -17,10 +17,12 @@ Consumers call this over HTTP with a shared Bearer secret; they do **not** need 
 
 ## GitHub Actions
 
+Padrão alinhado ao **GoAnimes**: `checkout@v6`, `setup-go@v6` (sem cache de módulos), `go vet`, **golangci-lint** `v2.11` (`.golangci.yml`), `go test -count=1`.
+
 | Workflow | Quando | O quê |
 |----------|--------|--------|
-| **ci** | push/PR em `main` | `go test ./...` |
-| **ghcr-publish** | push em `main` | test + build multi-arch (`linux/amd64`, `linux/arm64`) e push `ghcr.io/<owner>/goai:main` e `:sha` |
+| **ci** | PR para `main` / push em branches que **não** sejam `main` ou `master` | vet + lint + test + build (em `main` isto não corre — evita duplicar com **ghcr-publish**) |
+| **ghcr-publish** | push em `main` | vet + lint + test + imagem multi-arch no GHCR (`:main`, `:sha`) |
 
 Na VM (stack GoTV), o `oracle-deploy` do repo **GoTV** faz `docker compose pull goai`; se a imagem ainda não existir no GHCR, faz **build** a partir de `../../GoAI`.
 
