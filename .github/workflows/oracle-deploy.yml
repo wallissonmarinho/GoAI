@@ -128,6 +128,13 @@ jobs:
             if [ -n "${GHCR_PULL_TOKEN:-}" ]; then
               echo "$GHCR_PULL_TOKEN" | docker login ghcr.io -u "${GHCR_USER:-${GOAI_GHCR_OWNER}}" --password-stdin
             fi
+            # VM must have docker-compose.gotv.yml with service "goai" (deploy/oracle no repo). Sem pull fica versão antiga → "no such service: goai".
+            if [ -d "${ROOT}/.git" ]; then
+              echo "goai deploy: updating ${ROOT} (git pull --ff-only)"
+              git -C "${ROOT}" pull --ff-only
+            else
+              echo "goai deploy: ${ROOT} has no .git — ensure docker-compose.gotv.yml on the VM includes service goai (copy or pull deploy/oracle manually)."
+            fi
             cd "${ORACLE_DIR}"
             if docker compose -f docker-compose.gotv.yml pull goai; then
               echo "goai: image from GHCR"
