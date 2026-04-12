@@ -25,7 +25,9 @@ Padrão alinhado ao **GoAnimes**: `checkout@v6`, `setup-go@v6` (sem cache de mó
 | **oracle-deploy** | push em `main`/`master` ou *Run workflow* | Igual ao **GoAnimes**: jobs **test** → **image** (GHCR `:main`, `:sha`) → **deploy** (SSH, `.env.goai.deploy`, recreate **goai**) |
 | **release** | tag `v*` | vet + lint + test + build + artefacto `goai-linux-amd64` |
 
-**Repository secrets** (SSH, iguais aos do GoTV): `OCI_VM_HOST`, `OCI_VM_USER`, `OCI_SSH_PRIVATE_KEY`, opcional `OCI_DEPLOY_ROOT`, opcional `GHCR_*`.
+**Repository secrets** (SSH, iguais aos do GoTV): `OCI_VM_HOST`, `OCI_VM_USER`, `OCI_SSH_PRIVATE_KEY`, opcional `GHCR_*`.
+
+**Variable** (recomendado) ou secret: **`OCI_DEPLOY_ROOT`** — caminho na VM onde está `deploy/oracle` (ex. `/home/ubuntu/www`). Usar *Variable* evita máscara nos logs do Actions.
 
 **Environment `prd` (repo GoAI):** `GOAI_ADMIN_API_KEY`, `GOAI_GEMINI_API_KEYS`; variable opcional `GOAI_GEMINI_MODEL`. O GoTV **não** grava `GOAI_*` — deploys são independentes.
 

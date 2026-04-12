@@ -3,7 +3,8 @@
 # Job deploy: environment: prd → secrets/variables do ambiente **prd** (e Repository secrets OCI/GHCR)
 # são passados por SSH e gravados em deploy/oracle/.env.goai.deploy na VM.
 #
-# Repository secrets: OCI_VM_HOST, OCI_VM_USER, OCI_SSH_PRIVATE_KEY; opcional OCI_DEPLOY_ROOT, GHCR_*
+# Repository secrets: OCI_VM_HOST, OCI_VM_USER, OCI_SSH_PRIVATE_KEY; opcional GHCR_*
+# Variable (recomendado) ou secret: OCI_DEPLOY_ROOT = pasta pai de deploy/oracle na VM (ex: /home/ubuntu/www)
 #
 # Environment **prd** — Secrets: GOAI_ADMIN_API_KEY, GOAI_GEMINI_API_KEYS
 # Environment **prd** — Variables: GOAI_GEMINI_MODEL (opcional)
@@ -91,7 +92,8 @@ jobs:
       - name: Deploy GoAI on Oracle VM
         uses: appleboy/ssh-action@v1.2.0
         env:
-          OCI_DEPLOY_ROOT: ${{ secrets.OCI_DEPLOY_ROOT }}
+          # Path is not sensitive: prefer repo/env Variable OCI_DEPLOY_ROOT so logs show the real path. Fallback: secret (legacy).
+          OCI_DEPLOY_ROOT: ${{ vars.OCI_DEPLOY_ROOT || secrets.OCI_DEPLOY_ROOT }}
           GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
           GHCR_USER: ${{ secrets.GHCR_USER }}
           GOAI_GHCR_OWNER: ${{ steps.ghcr.outputs.owner }}
@@ -123,6 +125,12 @@ jobs:
               echo "ERROR: missing ${ORACLE_DIR}/docker-compose.gotv.yml" >&2
               exit 1
             fi
+            if [ ! -w "${ORACLE_DIR}" ]; then
+              echo "ERROR: ${ORACLE_DIR} is not writable by $(whoami). Example fix: sudo chown -R $(whoami) \"${ORACLE_DIR}\"" >&2
+              ls -ld "${ORACLE_DIR}" >&2 || true
+              exit 1
+            fi
+            echo "goai deploy: path OK (exists, compose file, writable)"
             DEPLOY_ENV="${ORACLE_DIR}/.env.goai.deploy"
             umask 077
             : > "${DEPLOY_ENV}"
@@ -136,8 +144,15 @@ jobs:
             write_kv GOAI_GEMINI_API_KEYS "${GOAI_GEMINI_API_KEYS:-}"
             write_kv GOAI_GEMINI_MODEL "${GOAI_GEMINI_MODEL:-}"
             chmod 600 "${DEPLOY_ENV}" || true
+            # docker login must not abort deploy (set -e + pipefail); invalid/empty token is common for public GHCR images.
             if [ -n "${GHCR_PULL_TOKEN:-}" ]; then
+              set +e
               echo "$GHCR_PULL_TOKEN" | docker login ghcr.io -u "${GHCR_USER:-${GOAI_GHCR_OWNER}}" --password-stdin
+              _login_rc=$?
+              set -e
+              if [ "${_login_rc}" -ne 0 ]; then
+                echo "goai deploy: WARN docker login ghcr.io failed (rc=${_login_rc}); continuing if image is public" >&2
+              fi
             fi
             # VM must have docker-compose.gotv.yml with service "goai" (deploy/oracle no repo). Sem pull fica versão antiga → "no such service: goai".
             if [ -d "${ROOT}/.git" ]; then
