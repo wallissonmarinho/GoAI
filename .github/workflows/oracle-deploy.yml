@@ -106,16 +106,21 @@ jobs:
           username: ${{ secrets.OCI_VM_USER }}
           key: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
           command_timeout: 30m
+          debug: true
           envs: OCI_DEPLOY_ROOT,GHCR_PULL_TOKEN,GHCR_USER,GOAI_GHCR_OWNER,GOAI_IMAGE_TAG,GOAI_ADMIN_API_KEY,GOAI_GEMINI_API_KEYS,GOAI_GEMINI_MODEL
           script_stop: true
           script: |
             set -euo pipefail
             ROOT="${OCI_DEPLOY_ROOT:-/opt/go}"
-            export GOAI_GHCR_OWNER="${GOAI_GHCR_OWNER}"
+            export GOAI_GHCR_OWNER="${GOAI_GHCR_OWNER:-}"
             export GOAI_IMAGE_TAG="${GOAI_IMAGE_TAG:-main}"
             ORACLE_DIR="${ROOT}/deploy/oracle"
             echo "goai deploy: effective ROOT=${ROOT} (set secret OCI_DEPLOY_ROOT if wrong)"
             echo "goai deploy: ORACLE_DIR=${ORACLE_DIR}"
+            if [ -z "${GOAI_GHCR_OWNER}" ]; then
+              echo "goai deploy: ERROR GOAI_GHCR_OWNER is empty on remote (check envs passed to ssh-action)" >&2
+              exit 1
+            fi
             if [ ! -d "${ORACLE_DIR}" ]; then
               echo "ERROR: ${ORACLE_DIR} does not exist." >&2
               echo "Create GitHub Actions secret OCI_DEPLOY_ROOT = parent of deploy/oracle (ex: /home/ubuntu/www)." >&2
@@ -133,39 +138,52 @@ jobs:
             echo "goai deploy: path OK (exists, compose file, writable)"
             DEPLOY_ENV="${ORACLE_DIR}/.env.goai.deploy"
             umask 077
-            : > "${DEPLOY_ENV}"
+            rm -f "${DEPLOY_ENV}" || true
+            : > "${DEPLOY_ENV}" || { echo "goai deploy: ERROR cannot create ${DEPLOY_ENV}" >&2; ls -la "${ORACLE_DIR}" >&2; exit 1; }
+            echo "goai deploy: step=env-file-empty"
             write_kv() {
               _k="$1"
               _v="$2"
               [ -n "${_v}" ] || return 0
-              printf '%s=%s\n' "${_k}" "${_v}" >> "${DEPLOY_ENV}"
+              printf '%s=%s\n' "${_k}" "${_v}" >> "${DEPLOY_ENV}" || {
+                echo "goai deploy: ERROR printf failed for ${_k}" >&2
+                exit 1
+              }
             }
             write_kv GOAI_ADMIN_API_KEY "${GOAI_ADMIN_API_KEY:-}"
             write_kv GOAI_GEMINI_API_KEYS "${GOAI_GEMINI_API_KEYS:-}"
             write_kv GOAI_GEMINI_MODEL "${GOAI_GEMINI_MODEL:-}"
+            echo "goai deploy: step=kvs-written"
             chmod 600 "${DEPLOY_ENV}" || true
-            # docker login must not abort deploy (set -e + pipefail); invalid/empty token is common for public GHCR images.
+            echo "goai deploy: step=chmod-done"
             if [ -n "${GHCR_PULL_TOKEN:-}" ]; then
               set +e
+              set +o pipefail
               echo "$GHCR_PULL_TOKEN" | docker login ghcr.io -u "${GHCR_USER:-${GOAI_GHCR_OWNER}}" --password-stdin
               _login_rc=$?
+              set -o pipefail
               set -e
               if [ "${_login_rc}" -ne 0 ]; then
                 echo "goai deploy: WARN docker login ghcr.io failed (rc=${_login_rc}); continuing if image is public" >&2
               fi
             fi
+            echo "goai deploy: step=docker-login-block-done"
             # VM must have docker-compose.gotv.yml with service "goai" (deploy/oracle no repo). Sem pull fica versão antiga → "no such service: goai".
             if [ -d "${ROOT}/.git" ]; then
               echo "goai deploy: updating ${ROOT} (git pull --ff-only)"
               git -C "${ROOT}" pull --ff-only
             else
-              echo "goai deploy: ${ROOT} has no .git — ensure docker-compose.gotv.yml on the VM includes service goai (copy or pull deploy/oracle manually)."
+              echo "goai deploy: ${ROOT} has no .git - sync deploy/oracle manually or clone repo at ROOT."
             fi
+            echo "goai deploy: step=git-block-done"
             cd "${ORACLE_DIR}"
+            echo "goai deploy: step=compose-pull"
             if docker compose -f docker-compose.gotv.yml pull goai; then
               echo "goai: image from GHCR"
             else
               echo "goai: pull failed, building from ../../GoAI"
               docker compose -f docker-compose.gotv.yml build goai
             fi
+            echo "goai deploy: step=compose-up"
             docker compose -f docker-compose.gotv.yml up -d --force-recreate goai
+            echo "goai deploy: done"
