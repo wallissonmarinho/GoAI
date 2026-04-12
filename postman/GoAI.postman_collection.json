@@ -1,0 +1,136 @@
+{
+	"info": {
+		"_postman_id": "a7c3e9b1-4d2f-4a8e-9c0d-goai-api-01",
+		"name": "GoAI",
+		"description": "API HTTP do GoAI.\n\nVariáveis da coleção:\n- `baseUrl` — ex.: `http://localhost:8088` (default do binário; ou `GOAI_HTTP_ADDR` / `PORT`)\n- `adminApiKey` — valor de `GOAI_ADMIN_API_KEY` (header `Authorization: Bearer …`; alias legado: `GOAI_INTERNAL_API_KEY`)\n\nRotas públicas: `GET /healthz`. Rotas `/v1/*` exigem Bearer.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8088"
+		},
+		{
+			"key": "adminApiKey",
+			"value": ""
+		}
+	],
+	"item": [
+		{
+			"name": "Public",
+			"item": [
+				{
+					"name": "GET healthz",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{baseUrl}}/healthz",
+						"description": "Sem autenticação."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "v1",
+			"auth": {
+				"type": "bearer",
+				"bearer": [
+					{
+						"key": "token",
+						"value": "{{adminApiKey}}",
+						"type": "string"
+					}
+				]
+			},
+			"item": [
+				{
+					"name": "POST audit/series (minimal)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"series_name\": \"Ascendance of a Bookworm\"\n}"
+						},
+						"url": "{{baseUrl}}/v1/audit/series",
+						"description": "Obrigatório: `series_name` e/ou `torrent_title`."
+					},
+					"response": []
+				},
+				{
+					"name": "POST audit/series (RSS + torrent Erai)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"series_name\": \"[Torrent] Honzuki no Gekokujou: Shisho ni Naru Tame ni wa Shudan wo Erandeiraremasen - Ryushu no Youjo - 02 (HEVC) [1080p CR WEBRip HEVC AAC][MultiSub][Encoded]\",\n  \"torrent_title\": \"[Erai-raws] Honzuki no Gekokujou S4 - 02 [1080p CR WEBRip HEVC AAC][MultiSub].mkv\",\n  \"torrent_link\": \"https://t.erai-raws.info/Torrent/2026/Spring/Honzuki no Gekokujou/[Erai-raws] Honzuki no Gekokujou S4 - 02 [1080p CR WEBRip HEVC AAC][MultiSub].mkv.torrent\"\n}"
+						},
+						"url": "{{baseUrl}}/v1/audit/series",
+						"description": "Exemplo alinhado a item RSS: título + link do torrent. Resposta inclui IDs, `release_season` / `release_episode`, `thetvdb_series_url` (se houver slug)."
+					},
+					"response": []
+				},
+				{
+					"name": "POST audit/series (com hints)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"series_name\": \"Bookworm\",\n  \"mal_id\": 41109,\n  \"year\": 2019,\n  \"title_preferred\": \"Ascendance of a Bookworm\",\n  \"title_native\": \"本好きの下剋上\",\n  \"existing_tvdb_series_id\": 366263\n}"
+						},
+						"url": "{{baseUrl}}/v1/audit/series",
+						"description": "Campos opcionais: `series_id`, `mal_id`, `imdb_id`, `year`, `title_preferred`, `title_native`, `existing_tvdb_series_id`, `existing_anidb_aid`, `existing_anilist_id`, `existing_tmdb_tv_id`."
+					},
+					"response": []
+				},
+				{
+					"name": "POST audit/release",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"torrent_title\": \"[Erai-raws] Honzuki no Gekokujou S4 - 02 [1080p CR WEBRip HEVC AAC][MultiSub].mkv\",\n  \"series_name\": \"Honzuki no Gekokujou\",\n  \"current_season\": 1,\n  \"current_episode\": 2,\n  \"is_special\": false\n}"
+						},
+						"url": "{{baseUrl}}/v1/audit/release",
+						"description": "Obrigatório: `torrent_title`. Opcional: `series_name`, `series_id`, `current_season`, `current_episode`, `is_special` como hints do parser."
+					},
+					"response": []
+				},
+				{
+					"name": "GET diag/gemini-keys",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{baseUrl}}/v1/diag/gemini-keys",
+						"description": "Lista-modelos por chave: `keys_ok` / `status` por índice (`ok`, `quota_or_rate`, `auth_error`, …). Não devolve chaves."
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}

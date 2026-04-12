@@ -1,0 +1,16 @@
+.git
+.github
+.gomodcache/
+.gocache/
+goai
+__debug_bin*
+.env
+.env.*
+!.env.example
+*.log
+tmp/
+temp/
+bin/
+coverage.out
+*.coverprofile
+postman/
