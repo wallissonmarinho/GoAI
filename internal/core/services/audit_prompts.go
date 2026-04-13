@@ -7,9 +7,12 @@ import (
 	"github.com/wallissonmarinho/GoAI/internal/core/domain"
 )
 
-const seriesSystem = `You are an expert anime catalog assistant. Map the series to public database IDs when you can justify them from well-known listings (TheTVDB v4, MyAnimeList, AniDB, AniList, TMDB TV). Jikan is an API over MyAnimeList; the numeric id to return is the MAL anime id (mal_id).
+const seriesSystem = `You are an expert anime catalog assistant. Map the series to public database IDs when you can justify them from reliable public listings (TheTVDB v4, TMDB TV, MyAnimeList).
+Primary identity should come from TheTVDB/TMDB/title consistency. MAL/AniDB/AniList ids are compatibility fields and should only be filled when clearly corroborated by the same canonical show.
 Use public knowledge and the hints given. TheTVDB uses TV seasons; anime often maps season 1 to the main cour.
 If torrent_title or torrent_link are present, also infer which episode release they describe: use TheTVDB-style aired season numbering (e.g. "S4", "Season 4", "4th Season", cours split as separate seasons when that is how TheTVDB lists them). Episode is the number after that season marker (e.g. "- 02", "E02", "EP02"). Mark release_is_special true for obvious OVA/ONA/special-only filenames.
+Input hints may include parsed_season_hint/parsed_episode_hint/parsed_is_special_hint from a deterministic parser; treat them as weak hints only. They can be wrong and must never override canonical mapping evidence.
+feed_published_at is when the RSS feed exposed the item (ingestion time), not the historical first air date; use it only as a weak recency signal, never as authoritative release chronology.
 
 Disambiguation rules (very important):
 - Many anime have near-identical romaji words ("kizoku", "tensei", "isekai", "boukenroku", etc.). Do NOT map by partial token overlap alone.
@@ -17,6 +20,7 @@ Disambiguation rules (very important):
 - If two candidates are close, prefer the one whose core noun phrase matches exactly (not just shared generic words like "tensei/isekai").
 - If still ambiguous, return 0 for uncertain ids and lower confidence (<=0.6). Never force a confident guess.
 - For thetvdb_slug/thetvdb_series_url, ensure slug/title consistency with the selected canonical series; do not output a slug from another similarly named franchise.
+- If primary identity (TVDB/TMDB/title) is uncertain, keep secondary ids (mal_id/anidb_aid/anilist_id) as 0.
 
 Cross-source consistency rules:
 - Use TMDB as an auxiliary cross-check for identity (tmdb_tv_id and titles), but keep release_season/release_episode aligned to TheTVDB aired order.
@@ -27,8 +31,8 @@ Cross-source consistency rules:
 Respond with ONLY a single JSON object, no markdown, no code fences, with these keys:
 - thetvdb_series_id (integer, 0 if unknown or uncertain)
 - mal_id (integer, MyAnimeList anime id, 0 if unknown)
-- anidb_aid (integer, AniDB anime id, 0 if unknown)
-- anilist_id (integer, AniList media id, 0 if unknown)
+- anidb_aid (integer, compatibility field; 0 if unknown)
+- anilist_id (integer, compatibility field; 0 if unknown)
 - tmdb_tv_id (integer, TMDB TV series id, 0 if unknown)
 - release_season (integer, TheTVDB aired-order season this file refers to; 0 if no torrent fields or not inferable)
 - release_episode (integer, episode number for that season; 0 if unknown)
@@ -54,6 +58,18 @@ func buildSeriesPrompt(in domain.SeriesAuditRequest) string {
 	}
 	if strings.TrimSpace(in.TorrentLink) != "" {
 		fmt.Fprintf(&b, `,"torrent_link":%q`, strings.TrimSpace(in.TorrentLink))
+	}
+	if strings.TrimSpace(in.FeedPublishedAt) != "" {
+		fmt.Fprintf(&b, `,"feed_published_at":%q`, strings.TrimSpace(in.FeedPublishedAt))
+	}
+	if in.ParsedSeasonHint > 0 {
+		fmt.Fprintf(&b, `,"parsed_season_hint":%d`, in.ParsedSeasonHint)
+	}
+	if in.ParsedEpisodeHint > 0 {
+		fmt.Fprintf(&b, `,"parsed_episode_hint":%d`, in.ParsedEpisodeHint)
+	}
+	if in.ParsedIsSpecialHint {
+		fmt.Fprintf(&b, `,"parsed_is_special_hint":true`)
 	}
 	if in.SeriesID != "" {
 		fmt.Fprintf(&b, `,"series_id":%q`, in.SeriesID)
@@ -97,13 +113,20 @@ Respond with ONLY a single JSON object, no markdown, with keys:
 - confidence (0 to 1)
 - notes (short string, English)
 
-Use current_season/current_episode/is_special from the parser as hints; correct them if the torrent title clearly implies otherwise.`
+Use current_season/current_episode/is_special from the parser only as weak hints; they can be wrong and should be overridden whenever title/source evidence indicates a different mapping.
+feed_published_at is RSS ingestion timestamp, not definitive air date; use only as weak supporting context.`
 
 func buildReleasePrompt(in domain.ReleaseAuditRequest) string {
 	var b strings.Builder
 	b.WriteString(releaseSystem)
 	b.WriteString("\n\n")
 	fmt.Fprintf(&b, "torrent_title: %q\n", in.TorrentTitle)
+	if strings.TrimSpace(in.TorrentLink) != "" {
+		fmt.Fprintf(&b, "torrent_link: %q\n", strings.TrimSpace(in.TorrentLink))
+	}
+	if strings.TrimSpace(in.FeedPublishedAt) != "" {
+		fmt.Fprintf(&b, "feed_published_at: %q\n", strings.TrimSpace(in.FeedPublishedAt))
+	}
 	if strings.TrimSpace(in.SeriesName) != "" {
 		fmt.Fprintf(&b, "series_name: %q\n", strings.TrimSpace(in.SeriesName))
 	}

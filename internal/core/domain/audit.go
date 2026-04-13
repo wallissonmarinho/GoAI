@@ -1,7 +1,7 @@
 package domain
 
 // AuditPromptVersion bump when changing system instructions (consumers may invalidate cache).
-const AuditPromptVersion = 5
+const AuditPromptVersion = 6
 
 // SeriesAuditRequest is the POST /v1/audit/series JSON body.
 // Provide series_name and/or torrent_title (at least one). torrent_link is optional context (path, group, season hints).
@@ -9,6 +9,10 @@ type SeriesAuditRequest struct {
 	SeriesName           string `json:"series_name,omitempty"`
 	TorrentTitle         string `json:"torrent_title,omitempty"`
 	TorrentLink          string `json:"torrent_link,omitempty"`
+	FeedPublishedAt      string `json:"feed_published_at,omitempty"`
+	ParsedSeasonHint     int    `json:"parsed_season_hint,omitempty"`
+	ParsedEpisodeHint    int    `json:"parsed_episode_hint,omitempty"`
+	ParsedIsSpecialHint  bool   `json:"parsed_is_special_hint,omitempty"`
 	SeriesID             string `json:"series_id,omitempty"`
 	MalID                int    `json:"mal_id,omitempty"`
 	ImdbID               string `json:"imdb_id,omitempty"`
@@ -42,6 +46,8 @@ type SeriesAuditResponse struct {
 // ReleaseAuditRequest is the POST /v1/audit/release JSON body.
 type ReleaseAuditRequest struct {
 	TorrentTitle   string `json:"torrent_title"`
+	TorrentLink    string `json:"torrent_link,omitempty"`
+	FeedPublishedAt string `json:"feed_published_at,omitempty"`
 	SeriesName     string `json:"series_name,omitempty"`
 	SeriesID       string `json:"series_id,omitempty"`
 	CurrentSeason  int    `json:"current_season,omitempty"`
