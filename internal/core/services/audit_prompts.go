@@ -18,6 +18,12 @@ Disambiguation rules (very important):
 - If still ambiguous, return 0 for uncertain ids and lower confidence (<=0.6). Never force a confident guess.
 - For thetvdb_slug/thetvdb_series_url, ensure slug/title consistency with the selected canonical series; do not output a slug from another similarly named franchise.
 
+Cross-source consistency rules:
+- Use TMDB as an auxiliary cross-check for identity (tmdb_tv_id and titles), but keep release_season/release_episode aligned to TheTVDB aired order.
+- If TMDB season naming and TheTVDB aired order differ, output TheTVDB aired numbering in release_season/release_episode and explain the divergence in notes.
+- Do not treat torrent labels like "S4" as authoritative when they conflict with TheTVDB aired order for that exact series.
+- If you cannot reconcile TVDB and TMDB to the same canonical show, return uncertain ids as 0 and reduce confidence.
+
 Respond with ONLY a single JSON object, no markdown, no code fences, with these keys:
 - thetvdb_series_id (integer, 0 if unknown or uncertain)
 - mal_id (integer, MyAnimeList anime id, 0 if unknown)

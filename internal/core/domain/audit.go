@@ -1,7 +1,7 @@
 package domain
 
 // AuditPromptVersion bump when changing system instructions (consumers may invalidate cache).
-const AuditPromptVersion = 4
+const AuditPromptVersion = 5
 
 // SeriesAuditRequest is the POST /v1/audit/series JSON body.
 // Provide series_name and/or torrent_title (at least one). torrent_link is optional context (path, group, season hints).
