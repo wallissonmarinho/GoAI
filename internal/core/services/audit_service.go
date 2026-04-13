@@ -12,12 +12,21 @@ import (
 
 // AuditService implements ports.AuditService (hex core: depends on TextCompletion port only).
 type AuditService struct {
-	llm ports.TextCompletion
+	llm            ports.TextCompletion
+	tvdbURLChecker ports.URLExistenceChecker
 }
 
 // NewAuditService wires the audit use-case.
 func NewAuditService(llm ports.TextCompletion) *AuditService {
 	return &AuditService{llm: llm}
+}
+
+// NewAuditServiceWithURLChecker wires the audit use-case with URL existence validation.
+func NewAuditServiceWithURLChecker(llm ports.TextCompletion, checker ports.URLExistenceChecker) *AuditService {
+	return &AuditService{
+		llm:            llm,
+		tvdbURLChecker: checker,
+	}
 }
 
 // PromptVersion returns the prompt schema version for downstream caches.
@@ -43,6 +52,7 @@ func (s *AuditService) AuditSeries(ctx context.Context, in domain.SeriesAuditReq
 		return domain.SeriesAuditResponse{}, fmt.Errorf("audit: parse series json: %w", err)
 	}
 	normalizeSeriesResponse(&out)
+	s.validateTheTVDBURL(ctx, &out)
 	return out, nil
 }
 
@@ -100,6 +110,40 @@ func normalizeReleaseResponse(out *domain.ReleaseAuditResponse) {
 	if out.Episode < 0 {
 		out.Episode = 0
 	}
+}
+
+func (s *AuditService) validateTheTVDBURL(ctx context.Context, out *domain.SeriesAuditResponse) {
+	if s == nil || s.tvdbURLChecker == nil {
+		return
+	}
+	url := strings.TrimSpace(out.TheTVDBSeriesURL)
+	if url == "" {
+		return
+	}
+	ok, err := s.tvdbURLChecker.Exists(ctx, url)
+	if err != nil || ok {
+		return
+	}
+	out.TheTVDBSeriesID = 0
+	out.TheTVDBName = ""
+	out.TheTVDBSlug = ""
+	out.TheTVDBSeriesURL = ""
+	if out.Confidence > 0.6 {
+		out.Confidence = 0.6
+	}
+	out.Notes = appendAuditNote(out.Notes, "thetvdb_series_url returned 404; cleared tvdb mapping for recheck")
+}
+
+func appendAuditNote(base, extra string) string {
+	base = strings.TrimSpace(base)
+	extra = strings.TrimSpace(extra)
+	if base == "" {
+		return extra
+	}
+	if extra == "" {
+		return base
+	}
+	return base + "; " + extra
 }
 
 var _ ports.AuditService = (*AuditService)(nil)

@@ -35,7 +35,8 @@ func Wire(cfg Config) *gin.Engine {
 		UserAgent: strings.TrimSpace(cfg.UserAgent),
 	}
 	var llm ports.TextCompletion = gc
-	audit := services.NewAuditService(llm)
+	urlCheckerClient := &http.Client{Timeout: 10 * time.Second}
+	audit := services.NewAuditServiceWithURLChecker(llm, newHTTPURLExistenceChecker(urlCheckerClient, cfg.UserAgent))
 	probeClient := &http.Client{Timeout: 45 * time.Second}
 	h := &ginapi.Handler{
 		Audit: audit,
